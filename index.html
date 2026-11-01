@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Демонстрация бота MAX — запись на пересдачу</title>
+<style>
+  :root {
+    --navy: #1f3a5f;
+    --blue: #2f6db5;
+    --bg: #eef3f8;
+    --card: #ffffff;
+    --muted: #5d7186;
+    --line: #cfdae6;
+    --bot: #ffffff;
+    --me: #d8e8d2;
+    --accent: #e5b02a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(circle at 20% 0%, #dcecf8 0, var(--bg) 45%);
+    color: #17212b;
+  }
+  .app { max-width: 780px; margin: 0 auto; padding: 18px 14px 40px; }
+  header {
+    background: var(--navy);
+    color: #fff;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 16px 36px rgba(31, 58, 95, .22);
+  }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: #c9d8e8; font-size: 13px; }
+  .badge {
+    display: inline-block;
+    margin-top: 10px;
+    background: var(--accent);
+    color: #2b2208;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+  }
+  .roles {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 14px 0 10px;
+  }
+  .roles button {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--navy);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .roles button.active {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 8px 24px rgba(31, 58, 95, .07);
+  }
+  .chat {
+    background: #e7edf4;
+    border-radius: 12px;
+    padding: 12px;
+    min-height: 330px;
+    max-height: 50vh;
+    overflow: auto;
+  }
+  .msg {
+    margin: 8px 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  .msg.from-bot { background: var(--bot); }
+  .msg.from-user { background: var(--me); margin-left: 40px; }
+  .msg .meta { display: block; margin-top: 5px; font-size: 10.5px; color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .actions button {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--navy);
+    border-radius: 9px;
+    padding: 8px 11px;
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .actions button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .hint { margin: 12px 0 0; font-size: 11.5px; color: var(--muted); }
+  .footer { margin-top: 14px; font-size: 11px; color: var(--muted); text-align: center; }
+  @media (max-width: 540px) { .app { padding: 10px; } header h1 { font-size: 17px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Бот записи на пересдачу — MAX</h1>
+    <p>Демонстрация сценария: студент → преподаватель → дирекция</p>
+    <span class="badge">Демо-режим · данные вымышлены · сервер не требуется</span>
+  </header>
+
+  <div class="roles">
+    <button data-role="student" class="active">Студент (1001)</button>
+    <button data-role="teacher">Преподаватель (2001)</button>
+    <button data-role="director">Дирекция (3001)</button>
+  </div>
+
+  <div class="panel">
+    <div class="chat" id="chat"></div>
+    <div class="actions" id="actions"></div>
+    <p class="hint">Это статическая демонстрация интерфейса и логики. Реальные сообщения в MAX не отправляются.</p>
+  </div>
+
+  <div class="footer">Южный университет (ИУБиП) · проект iubip-retake-bot</div>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const actions = document.getElementById("actions");
+let role = "student";
+let step = 0;
+
+const messages = {
+  student: [
+    ["bot", "Здравствуйте! Это бот записи на пересдачу.\nВыберите дисциплину:", "MAX · 10:02"],
+    ["user", "/start", "Вы · 10:02"],
+    ["bot", "Открытые сессии по дисциплине «Математический анализ»:\n1. 12.11.2026, 10:00, ауд. А-204\n2. 14.11.2026, 14:00, ауд. А-310", "MAX · 10:02"],
+    ["user", "12.11.2026, 10:00", "Вы · 10:03"],
+    ["bot", "Введите ФИО:", "MAX · 10:03"],
+    ["user", "Иванов Иван Иванович", "Вы · 10:03"],
+    ["bot", "Введите группу:", "MAX · 10:03"],
+    ["user", "ЮД-201", "Вы · 10:04"],
+    ["bot", "Проверьте данные:\nИванов Иван Иванович, ЮД-201\nСессия: 12.11.2026, 10:00, ауд. А-204", "MAX · 10:04"],
+    ["user", "Всё верно", "Вы · 10:04"],
+    ["bot", "Вы записаны! Номер записи: B-1042.\nПриложите чек об оплате или нажмите «Пропустить».", "MAX · 10:04"],
+    ["user", "Пропустить", "Вы · 10:05"],
+    ["bot", "Вы допущены к пересдаче. Чек к записи B-1042 не приложен.", "MAX · 10:05"]
+  ],
+  teacher: [
+    ["bot", "Мои сессии:\n• Математический анализ — 12.11.2026, 10:00, ауд. А-204\n• Математический анализ — 14.11.2026, 14:00, ауд. А-310", "MAX · 10:10"],
+    ["user", "Список записавшихся", "Вы · 10:10"],
+    ["bot", "Записалось: 1\nИванов Иван Иванович · ЮД-201 · оплата: submitted · чек: нет", "MAX · 10:10"],
+    ["user", "Отменить сессию 14.11", "Вы · 10:11"],
+    ["bot", "Сессия отменена. Уведомлений отправлено: 1.", "MAX · 10:11"]
+  ],
+  director: [
+    ["bot", "Дирекция: доступны действия по записям и оплатам.", "MAX · 10:20"],
+    ["user", "Отметить оплату B-1042", "Вы · 10:20"],
+    ["bot", "Запись B-1042: оплата отмечена как «оплачено».\nСтуденту отправлено уведомление.", "MAX · 10:20"],
+    ["user", "Импорт реестра", "Вы · 10:21"],
+    ["bot", "Реестр обработан.\nВсего строк: 2\nСопоставлено: 1\nНе сопоставлено: 1 (Петров П. П.)", "MAX · 10:21"],
+    ["user", "Выгрузить CSV", "Вы · 10:22"],
+    ["bot", "Выгрузка готова: bookings.csv (демо).", "MAX · 10:22"]
+  ]
+};
+
+function renderRole() {
+  chat.innerHTML = "";
+  actions.innerHTML = "";
+  const list = messages[role];
+  const shown = role === "student" ? Math.min(list.length, step || list.length) : list.length;
+  list.slice(0, shown).forEach(([kind, text, meta]) => addMessage(kind, text, meta));
+  if (role === "student") {
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.textContent = step < list.length ? "Следующий шаг" : "Начать заново";
+    btn.onclick = () => {
+      if (step < list.length) step += 1; else step = 0;
+      renderRole();
+    };
+    actions.appendChild(btn);
+  } else {
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.textContent = "Показать сценарий заново";
+    btn.onclick = () => renderRole();
+    actions.appendChild(btn);
+  }
+}
+
+function addMessage(kind, text, meta) {
+  const el = document.createElement("div");
+  el.className = "msg from-" + kind;
+  el.textContent = text;
+  if (meta) {
+    const m = document.createElement("span");
+    m.className = "meta";
+    m.textContent = meta;
+    el.appendChild(m);
+  }
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+document.querySelectorAll(".roles button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".roles button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    role = btn.dataset.role;
+    step = 0;
+    renderRole();
+  };
+});
+
+renderRole();
+</script>
+</body>
+</html>
